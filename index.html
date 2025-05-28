@@ -1,0 +1,481 @@
+
+<!DOCTYPE html>
+
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>ラッキー傭兵団 募集画像作成ツール</title>
+<style>
+    body {
+      font-family: sans-serif;
+      max-width: 400px;
+      margin: 0 auto;
+      padding: 10px;
+    }
+    .section {
+      margin-bottom: 10px;
+    }
+    .row {
+      margin-bottom: 6px;
+      white-space: nowrap;
+    }
+    #printArea {
+      padding: 10px;
+      background: #fff;
+      border: 1px solid #ccc;
+      margin-top: 20px;
+    }
+    .indent {
+      padding-left: 1em;
+    }
+    .range-pair {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+  </style>
+<style>
+      #canvasPreview, #printArea {
+        transition: opacity 0.3s ease;
+      }
+      .hidden {
+        opacity: 0;
+        pointer-events: none;
+        position: absolute;
+        z-index: -1;
+      }
+      .visible {
+        opacity: 1;
+        pointer-events: auto;
+        position: static;
+        z-index: 0;
+      }
+    </style>
+</head>
+<body>
+<div class="section">
+    モード選択：
+    <label><input id="modeNoma" type="checkbox"/>ノマ</label>
+<label><input id="modeHado" type="checkbox"/>ハド</label>
+<label><input id="modeJigoku" type="checkbox"/>地獄</label>
+<label><input id="modeKami" type="checkbox"/>神</label>
+</div>
+<div class="section" id="hadoOptions" style="display:none;">
+<label><input id="hadoDestroy" type="checkbox"/>ダンジョン即破壊OK</label>
+<label><input id="hadoForce" type="checkbox"/>むしろ即破壊します</label>
+</div>
+<div class="section">
+    協力回数：
+    <div class="range-pair">
+<input id="coopMin" max="5" min="1" type="range" value="1">
+<span>～</span>
+<input id="coopMax" max="5" min="1" type="range" value="3">
+</input></input></div>
+<div class="row" id="coopLabel"></div>
+</div>
+<div class="section">
+<label><input id="stamina" type="checkbox"/>スタミナ回復可</label>
+<label><input id="roulette" type="checkbox"/>ルーレット優先可</label>
+</div>
+<div class="section">
+    自分金庫Lv：
+    <select id="selfVault">
+<option value="提示なし">提示なし</option>
+<option value="0">0</option>
+<option value="1">1</option>
+<option value="2">2</option>
+<option value="3">3</option>
+<option value="4">4</option>
+<option value="5">5</option>
+<option value="6">6</option>
+<option value="7">7</option>
+<option value="8">8</option>
+<option value="9">9</option>
+<option value="10">10</option>
+<option value="11">11</option>
+</select>
+    希望金庫Lv：
+    <select id="desiredVault">
+<option value="希望なし">希望なし</option>
+<option value="0">0</option>
+<option value="1">1</option>
+<option value="2">2</option>
+<option value="3">3</option>
+<option value="4">4</option>
+<option value="5">5</option>
+<option value="6">6</option>
+<option value="7">7</option>
+<option value="8">8</option>
+<option value="9">9</option>
+<option value="10">10</option>
+<option value="11">11</option>
+</select>
+</div>
+<div class="section">
+<div class="range-pair"><span>ランス軸寄り</span><input id="axisSlider" max="5" min="0" style="flex:1;" type="range" value="2"><span>コイン軸寄り</span></input></div>
+</div>
+<div class="section">
+    所有ランスLv：
+    <select id="lancelot">
+<option value="0">0</option><option value="6">6</option><option selected="" value="12">12</option><option value="15">15</option>
+</select>
+</div>
+<div class="section">
+    クリア数提示（チェックでスライダー表示）：
+    <div>
+<label><input class="clearMode" data-id="ノマ" type="checkbox"/>ノマ</label>
+<label><input class="clearMode" data-id="ハド" type="checkbox"/>ハド</label>
+<label><input class="clearMode" data-id="地獄" type="checkbox"/>地獄</label>
+<label><input class="clearMode" data-id="神" type="checkbox"/>神</label>
+</div>
+<div class="section" id="clearSliders"></div>
+</div>
+<div class="section">
+<div><label><input checked="" id="fullPower" type="checkbox"/>全力で戦います</label></div>
+<div><label><input checked="" id="noNeglect" type="checkbox"/>途中で放置や手抜きは通報・報告します</label></div>
+<div><label><input id="maybeAuto" type="checkbox"/>単身クリア可能火力を配置後は放置するかも</label></div>
+<div><label><input id="mayNeglect" type="checkbox"/>途中で放置や手抜きをするかも</label></div>
+</div>
+<div class="section">
+<label>必要であれば補足事項を書き込む</label><br/>
+<textarea id="note" rows="2" style="width: 100%;"></textarea>
+</div>
+<button id="generateBtn">作成する画像を確認(下に表示)</button>
+<button id="saveImageBtn">下のテキストを画像化</button>
+<div class="row" id="modeLabel" style="font-size: 0.9em; color: #666; margin-bottom: 4px;">現在表示中：テキスト状態</div>
+<div class="visible" id="printArea"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script>
+document.getElementById("saveImageBtn").addEventListener("click", function () {
+  const target = document.getElementById("printArea");
+  const overlaySrc = document.getElementById("overlayImage").src;
+
+  html2canvas(target, {
+    scale: 1,
+    backgroundColor: "#ffffff"
+  }).then(canvas => {
+    const finalCanvas = document.createElement("canvas");
+    finalCanvas.width = canvas.width;
+    finalCanvas.height = canvas.height;
+    const ctx = finalCanvas.getContext("2d");
+
+    ctx.drawImage(canvas, 0, 0);
+
+    const overlayImg = new Image();
+    overlayImg.src = overlaySrc;
+    overlayImg.onload = () => {
+      const overlayWidth = 40;
+      const overlayHeight = overlayImg.height * (overlayWidth / overlayImg.width);
+      ctx.drawImage(
+        overlayImg,
+        finalCanvas.width - overlayWidth - 10,
+        10,
+        overlayWidth,
+        overlayHeight
+      );
+
+      const existing = document.getElementById("canvasPreview");
+      if (existing) existing.remove();
+
+      finalCanvas.id = "canvasPreview";
+      finalCanvas.classList.add("visible");
+      finalCanvas.style.marginTop = "20px";
+
+      document.getElementById("saveImageBtn").style.display = "none";
+      target.classList.remove("visible");
+      target.classList.add("hidden");
+      document.getElementById("modeLabel").textContent = "現在表示中：画像(長押しで保存)";
+      target.parentNode.insertBefore(finalCanvas, target.nextSibling);
+    };
+  });
+});
+</script>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const generateBtn = document.getElementById("generateBtn");
+  // ボタンを非表示にする
+  if (generateBtn) {
+    generateBtn.style.display = "none";
+    setTimeout(() => generateBtn.click(), 1000); // 1秒後にクリック
+}
+
+  // 入力があればボタンクリックを呼び出す
+  const autoTriggerElements = document.querySelectorAll("input, select, textarea");
+  autoTriggerElements.forEach(el => {
+    el.addEventListener("input", () => { 
+  const printArea = document.getElementById("printArea");
+  const canvasPreview = document.getElementById("canvasPreview");
+  if (canvasPreview) canvasPreview.remove();
+  if (canvasPreview) canvasPreview.remove();
+  if (printArea) {
+    printArea.classList.remove("hidden");
+    printArea.classList.add("visible");
+    document.getElementById("modeLabel").textContent = "現在表示中：テキスト状態";
+  }
+  document.getElementById("saveImageBtn").style.display = "inline-block";
+ generateBtn.click(); });
+    el.addEventListener("change", () => { 
+  const printArea = document.getElementById("printArea");
+  const canvasPreview = document.getElementById("canvasPreview");
+  if (canvasPreview) canvasPreview.remove();
+  if (canvasPreview) canvasPreview.remove();
+  if (printArea) {
+    printArea.classList.remove("hidden");
+    printArea.classList.add("visible");
+    document.getElementById("modeLabel").textContent = "現在表示中：テキスト状態";
+  }
+  document.getElementById("saveImageBtn").style.display = "inline-block";
+ generateBtn.click(); });
+  });
+
+  // クリア数提示スライダーが生成されたときにも再バインド
+  const clearTextMap = ["未クリア", "50↓", "500↓", "2000↓", "数えるのをやめた"];
+  const clearOrder = ["ノマ", "ハド", "地獄", "神"];
+  const container = document.getElementById("clearSliders");
+
+  document.querySelectorAll(".clearMode").forEach(cb => {
+    cb.addEventListener("change", () => {
+      const id = cb.dataset.id;
+      const existing = document.getElementById("slider-" + id);
+      if (cb.checked && !existing) {
+        const wrap = document.createElement("div");
+        wrap.className = "row";
+        wrap.id = "slider-" + id;
+        wrap.innerHTML = `・${id}（<input type="range" min="0" max="4" value="0" data-id="${id}" class="clearSlider"> <span id="label-${id}">未クリア</span>）`;
+        container.appendChild(wrap);
+
+        const slider = wrap.querySelector("input.clearSlider");
+        slider.addEventListener("input", () => {
+          document.getElementById("label-" + id).textContent = clearTextMap[slider.value];
+          generateBtn.click(); // 動的反映
+        });
+
+        const elements = clearOrder.map(mode => document.getElementById("slider-" + mode)).filter(el => el);
+        container.innerHTML = "";
+        elements.forEach(el => container.appendChild(el));
+
+        generateBtn.click(); // 初回反映
+      } else if (!cb.checked && existing) {
+        existing.remove();
+        generateBtn.click();
+      }
+    });
+  });
+});
+</script>
+<img id="overlayImage" src="syou.png" style="display: none;"/></body>
+</html>
+<script>
+  window.onload = function () {
+    function updateCoopLabel() {
+      const min = parseInt(document.getElementById("coopMin").value);
+      const max = parseInt(document.getElementById("coopMax").value);
+      const [a, b] = min <= max ? [min, max] : [max, min];
+      const label = "協力回数：" + (a === b ? `${a}回` : `${a}回 ～ ${b <= 4 ? b + "回" : "それ以上"}`);
+      document.getElementById("coopLabel").textContent = label;
+    }
+
+    document.getElementById("coopMin").addEventListener("input", updateCoopLabel);
+    document.getElementById("coopMax").addEventListener("input", updateCoopLabel);
+    updateCoopLabel();
+
+    const lancelotSection = document.querySelector("select#lancelot").closest(".section");
+    const axisSlider = document.getElementById("axisSlider");
+
+    function updateLancelotVisibility() {
+      const val = parseInt(axisSlider.value);
+      lancelotSection.style.display = val >= 4 ? "none" : "block";
+    }
+
+    axisSlider.addEventListener("input", updateLancelotVisibility);
+    updateLancelotVisibility();
+
+    document.getElementById("modeHado").addEventListener("change", function () {
+      document.getElementById("hadoOptions").style.display = this.checked ? "block" : "none";
+    });
+
+    const clearTextMap = ["未クリア", "50↓", "500↓", "2000↓", "数えるのをやめた"];
+    const clearOrder = ["ノマ", "ハド", "地獄", "神"];
+    const container = document.getElementById("clearSliders");
+
+    document.querySelectorAll(".clearMode").forEach(cb => {
+      cb.addEventListener("change", () => {
+        const id = cb.dataset.id;
+        const existing = document.getElementById("slider-" + id);
+        if (cb.checked && !existing) {
+          const wrap = document.createElement("div");
+          wrap.className = "row";
+          wrap.id = "slider-" + id;
+          wrap.innerHTML = `・${id}（<input type="range" min="0" max="4" value="0" data-id="${id}" class="clearSlider"> <span id="label-${id}">未クリア</span>）`;
+          container.appendChild(wrap);
+
+          const elements = clearOrder.map(mode => document.getElementById("slider-" + mode)).filter(el => el);
+          container.innerHTML = "";
+          elements.forEach(el => container.appendChild(el));
+        } else if (!cb.checked && existing) {
+          existing.remove();
+        }
+      });
+    });
+
+    document.addEventListener("input", e => {
+      if (e.target.classList.contains("clearSlider")) {
+        const id = e.target.dataset.id;
+        document.getElementById("label-" + id).textContent = clearTextMap[e.target.value];
+      }
+    });
+
+    document.getElementById("generateBtn").addEventListener("click", () => {
+      const lines = [];
+      const checked = id => document.getElementById(id)?.checked;
+      const val = id => document.getElementById(id)?.value;
+
+      const modes = [];
+      if (checked("modeNoma")) modes.push("ノマ");
+      if (checked("modeHado")) modes.push("ハド");
+      if (checked("modeJigoku")) modes.push("地獄");
+      if (checked("modeKami")) modes.push("神");
+      if (modes.length) lines.push(`<span style="color: red; font-weight: bold;">モード選択：${modes.join(" / ")}</span>`);
+      if (checked("hadoDestroy")) lines.push("ダンジョン即破壊OK：✔");
+      if (checked("hadoForce")) lines.push("むしろ即破壊します：✔");
+
+      const a = parseInt(document.getElementById("coopMin").value);
+      const b = parseInt(document.getElementById("coopMax").value);
+      const [min, max] = a <= b ? [a, b] : [b, a];
+      lines.push(`協力回数：<span style="color: blue; font-weight: bold;">${min === max ? `${min}回` : `${min}回 ～ ${max <= 4 ? max + "回" : "それ以上"}`}</span>`);
+
+      if (checked("stamina")) lines.push("スタミナ回復可：✔");
+      if (checked("roulette")) lines.push("ルーレット優先可：✔");
+
+      if (val("selfVault") !== "提示なし") if (val("selfVault") !== "提示なし") lines.push(`自分金庫Lv：<span style="color: red; font-weight: bold;">${val("selfVault")}</span>`);
+      if (val("desiredVault") !== "希望なし") if (val("desiredVault") !== "希望なし") lines.push(`希望金庫Lv：<span style="color: red; font-weight: bold;">${val("desiredVault")}</span>`);
+
+      const axisLabel = ["完全ランス軸", "ランス軸", "ややランス軸", "ややコイン軸", "コイン軸", "完全コイン軸"];
+      const axisVal = parseInt(val("axisSlider"));
+      lines.push("軸傾向：" + axisLabel[axisVal]);
+
+      if (axisVal < 4) {
+        lines.push("所有ランスLv：" + val("lancelot") + "以上");
+      }
+
+      const sliders = document.querySelectorAll(".clearSlider");
+      if (sliders.length > 0) {
+        lines.push("クリア数提示：");
+        sliders.forEach(sl => {
+          const id = sl.dataset.id;
+          const text = clearTextMap[sl.value];
+          lines.push("　・" + id + "（" + text + "）");
+        });
+      }
+
+      if (checked("fullPower")) lines.push("全力で戦います：✔");
+      if (checked("noNeglect")) lines.push("途中で放置や手抜きは通報・報告します：✔");
+      if (checked("maybeAuto")) lines.push("単身クリア可能火力を配置後は放置するかも：✔");
+      if (checked("mayNeglect")) lines.push("途中で放置や手抜きをするかも：✔");
+
+      
+    const note = document.getElementById("note").value.trim();
+    if (note) lines.push("【補足】" + note.replace(/\n/g, " "));
+    document.getElementById("printArea").innerHTML = lines.map(l => `<div class="row">${l}</div>`).join("");
+
+    });
+  };
+</script>
+<div style="margin-top: 18px; font-size: 0.8em; text-align: center; color: #666;">
+    ※このWebアプリの使用により発生したいかなる損害・不利益についても、作者(Menbo)は一切の責任を負いません。
+  </div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script>
+  document.getElementById("saveImageBtn").addEventListener("click", function () {
+    const target = document.getElementById("printArea");
+    html2canvas(target, {
+      scale: 2,
+      backgroundColor: "#ffffff"
+    }).then(canvas => {
+      const existing = document.getElementById("canvasPreview");
+      if (existing) existing.remove();
+      canvas.id = "canvasPreview"; canvas.classList.add("visible");
+      canvas.style.marginTop = "20px";
+      document.getElementById("saveImageBtn").style.display = "none";
+      target.classList.remove("visible"); target.classList.add("hidden");
+      document.getElementById("modeLabel").textContent = "現在表示中：画像(長押しで保存)";
+      target.parentNode.insertBefore(canvas, target.nextSibling);
+    });
+  });
+</script>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const generateBtn = document.getElementById("generateBtn");
+  // ボタンを非表示にする
+  if (generateBtn) {
+    generateBtn.style.display = "none";
+    setTimeout(() => generateBtn.click(), 1000); // 1秒後にクリック
+}
+
+  // 入力があればボタンクリックを呼び出す
+  const autoTriggerElements = document.querySelectorAll("input, select, textarea");
+  autoTriggerElements.forEach(el => {
+    el.addEventListener("input", () => { 
+  const printArea = document.getElementById("printArea");
+  const canvasPreview = document.getElementById("canvasPreview");
+  if (canvasPreview) canvasPreview.remove();
+  if (canvasPreview) canvasPreview.remove();
+  if (printArea) {
+    printArea.classList.remove("hidden");
+    printArea.classList.add("visible");
+    document.getElementById("modeLabel").textContent = "現在表示中：テキスト状態";
+  }
+  document.getElementById("saveImageBtn").style.display = "inline-block";
+ generateBtn.click(); });
+    el.addEventListener("change", () => { 
+  const printArea = document.getElementById("printArea");
+  const canvasPreview = document.getElementById("canvasPreview");
+  if (canvasPreview) canvasPreview.remove();
+  if (canvasPreview) canvasPreview.remove();
+  if (printArea) {
+    printArea.classList.remove("hidden");
+    printArea.classList.add("visible");
+    document.getElementById("modeLabel").textContent = "現在表示中：テキスト状態";
+  }
+  document.getElementById("saveImageBtn").style.display = "inline-block";
+ generateBtn.click(); });
+  });
+
+  // クリア数提示スライダーが生成されたときにも再バインド
+  const clearTextMap = ["未クリア", "50↓", "500↓", "2000↓", "数えるのをやめた"];
+  const clearOrder = ["ノマ", "ハド", "地獄", "神"];
+  const container = document.getElementById("clearSliders");
+
+  document.querySelectorAll(".clearMode").forEach(cb => {
+    cb.addEventListener("change", () => {
+      const id = cb.dataset.id;
+      const existing = document.getElementById("slider-" + id);
+      if (cb.checked && !existing) {
+        const wrap = document.createElement("div");
+        wrap.className = "row";
+        wrap.id = "slider-" + id;
+        wrap.innerHTML = `・${id}（<input type="range" min="0" max="4" value="0" data-id="${id}" class="clearSlider"> <span id="label-${id}">未クリア</span>）`;
+        container.appendChild(wrap);
+
+        const slider = wrap.querySelector("input.clearSlider");
+        slider.addEventListener("input", () => {
+          document.getElementById("label-" + id).textContent = clearTextMap[slider.value];
+          generateBtn.click(); // 動的反映
+        });
+
+        const elements = clearOrder.map(mode => document.getElementById("slider-" + mode)).filter(el => el);
+        container.innerHTML = "";
+        elements.forEach(el => container.appendChild(el));
+
+        generateBtn.click(); // 初回反映
+      } else if (!cb.checked && existing) {
+        existing.remove();
+        generateBtn.click();
+      }
+    });
+  });
+});
+</script>
+
+
